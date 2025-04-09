@@ -1,0 +1,35 @@
+# === General ===
+*.log
+*.env
+.env.*
+.DS_Store
+node_modules/
+dist/
+build/
+coverage/
+.vscode/
+__pycache__/
+*.py[cod]
+
+# === Python / Flask ===
+*.pyc
+instance/
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+.mypy_cache/
+.pytest_cache/
+.env
+.venv/
+venv/
+Pipfile.lock
+
+# === React / Frontend ===
+frontend/node_modules/
+frontend/.next/
+frontend/.env
+frontend/build/
+frontend/dist/
+
+# === Docker ===
