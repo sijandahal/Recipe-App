@@ -3,13 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@headlessui/react": "^2.2.1",
+    "@heroicons/react": "^2.2.0",
     "axios": "^1.8.4",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
-    "react-scripts": "5.0.0"
+    "react-router-dom": "^7.5.0",
+    "react-scripts": "5.0.0",
+    "react-toastify": "^11.0.5"
   },
   "scripts": {
-    "start": "react-scripts start"
+    "dev": "concurrently \"npm run start\" \"npm run dev:css\"",
+    "start": "react-scripts start",
+    "dev:css": "npx tailwindcss -i ./src/input.css -o ./src/output.css --watch"
   },
   "browserslist": {
     "production": [
@@ -22,5 +28,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "tailwindcss": "^3.4.17"
   }
 }

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import axios from "axios";
-import "../"
 
 const GroceryForm = () => {
   const [ingredients, setIngredients] = useState("");
@@ -27,7 +26,7 @@ const GroceryForm = () => {
   };
 
   return (
-    <div className="bg-blue-500 text-3xl font-bold underline" style={{ maxWidth: 500, margin: "auto", padding: 20 }}>
+    <div className="bg-blue-500 text-xl font-bold underline" style={{ maxWidth: 500, margin: "auto", padding: 20 }}>
       <form onSubmit={handleSubmit}>
         <label className="text-4xl text-indigo-600 font-bold underline">Ingredients (comma separated)</label>
         <input
