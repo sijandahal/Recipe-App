@@ -31,5 +31,6 @@ frontend/.next/
 frontend/.env
 frontend/build/
 frontend/dist/
+mainrecepie.csv
 
 # === Docker ===

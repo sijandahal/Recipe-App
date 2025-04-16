@@ -1061,6 +1061,11 @@ video {
   background-color: rgb(163 32 51 / var(--tw-bg-opacity, 1));
 }
 
+.bg-primaryLight {
+  --tw-bg-opacity: 1;
+  background-color: rgb(127 31 45 / var(--tw-bg-opacity, 1));
+}
+
 .bg-white {
   --tw-bg-opacity: 1;
   background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
@@ -1069,11 +1074,6 @@ video {
 .bg-yellow-100 {
   --tw-bg-opacity: 1;
   background-color: rgb(254 249 195 / var(--tw-bg-opacity, 1));
-}
-
-.bg-primaryLight {
-  --tw-bg-opacity: 1;
-  background-color: rgb(127 31 45 / var(--tw-bg-opacity, 1));
 }
 
 .object-cover {

@@ -1,3 +1,4 @@
+
 services:
   backend:
     build: ./backend
@@ -7,6 +8,8 @@ services:
       - ./backend:/app
     depends_on:
       - mongo
+      - kafka
+      - mysql
 
   frontend:
     build: ./frontend
@@ -21,3 +24,53 @@ services:
     image: mongo
     ports:
       - "27017:27017"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.2.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.2.1
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    ports:
+      - "3307:3306"  # external:internal
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: forkast
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "mysql", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  consumer:
+    build:
+      context: ./consumer
+    depends_on:
+      kafka:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./mainrecepie.csv:/app/mainrecepie.csv
+
+volumes:
+  mysql-data:

@@ -25,7 +25,7 @@ export default function SigninPage() {
         toast.success("Login successful!");
         localStorage.setItem("email", email);
 
-        // navigate('/dashboard') or similar if using routing
+        
       } else {
         toast.error(data.error || "Login failed");
       }
