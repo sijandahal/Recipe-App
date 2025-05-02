@@ -27,6 +27,7 @@ import {
   ChevronDownIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/20/solid";
+import GroceryForm from "../GroceryForm";
 
 const navigation = [
   { name: "Dashboard", href: "#", icon: HomeIcon, current: true },
@@ -251,6 +252,7 @@ export default function Dashboard() {
             <p className="mt-2 text-gray-600">
               This is your Forkast dashboard.
             </p>
+            <GroceryForm/>
           </div>
         </main>
       </div>

@@ -71,6 +71,47 @@ services:
     restart: unless-stopped
     volumes:
       - ./mainrecepie.csv:/app/mainrecepie.csv
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    environment:
+      - CLUSTER_NAME=forkast-hadoop
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000  # ✅ ADD THIS LINE
+    volumes:
+      - hdfs-namenode:/hadoop/dfs/name
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    environment:
+      - CLUSTER_NAME=forkast-hadoop
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - hdfs-datanode:/hadoop/dfs/data
+    depends_on:
+      - namenode
+
+  spark:
+    image: bitnami/spark:latest
+    container_name: spark
+    depends_on:
+      - namenode
+    command: >
+      bash -c "
+      pip install -r /app/requirements.txt &&
+      sleep infinity
+      "
+    volumes:
+      - ./spark-scripts:/app
+      - ./spark-scripts/jars:/opt/spark/jars
 
 volumes:
   mysql-data:
+  hdfs-namenode:
+  hdfs-datanode:
+
+
+  

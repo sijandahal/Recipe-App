@@ -124,8 +124,7 @@ You’ll see output like:
 
 Go to sql
 
-docker exec -it mysql mysql -uroot -proot forkast
-
+ne
 Then in the MySQL prompt:
 SELECT COUNT(*) FROM recipes;
 SELECT * FROM recipes LIMIT 5;

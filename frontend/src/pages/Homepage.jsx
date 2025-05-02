@@ -5,6 +5,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Button from "../components/Button/Button";
 import { useNavigate } from "react-router-dom";
+import GroceryForm from "../components/GroceryForm";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -128,6 +129,7 @@ const Home = () => {
           </div>
         </div>
       </div>
+      <GroceryForm/>
     </div>
   );
 };

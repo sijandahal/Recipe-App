@@ -3,27 +3,37 @@ import pandas as pd
 import json
 import time
 
-KAFKA_BROKER = 'kafka:9092'
-TOPIC = 'recipes'
-
 producer = KafkaProducer(
-    bootstrap_servers=KAFKA_BROKER,
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+    bootstrap_servers='kafka:9092',
+    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+    compression_type='gzip',
+    linger_ms=100,
+    batch_size=65536
 )
 
-# Chunked reading
-chunk_size = 1000
-total_rows = 0
+chunksize = 20000
+total_sent = 0
+start = time.time()
 
-print("📦 Starting to stream CSV in chunks...")
+print("📦 Starting high-speed Kafka ingestion...")
 
-for chunk in pd.read_csv('mainrecepie.csv', chunksize=chunk_size, engine='python', dtype=str):
-    for _, row in chunk.iterrows():
-        producer.send(TOPIC, value=row.to_dict())
-        total_rows += 1
+for chunk_index, chunk in enumerate(pd.read_csv('mainrecepie.csv', dtype=str, chunksize=chunksize, low_memory=False)):
+    records = chunk.to_dict(orient='records')
+    futures = []
 
-    print(f"📤 Sent {total_rows} rows so far...")
-    time.sleep(0.1)  # Throttle slightly
+    for record in records:
+        futures.append(producer.send('recipes', value=record))
+
+    for future in futures:
+        try:
+            future.get(timeout=10)
+        except Exception as e:
+            print(f"⚠️ Kafka send error: {e}")
+
+    producer.flush()
+    total_sent += len(records)
+    print(f"✅ Chunk {chunk_index + 1}: Sent {len(records)} records — Total: {total_sent}")
 
 producer.flush()
-print(f"✅ Finished sending {total_rows} rows to Kafka.")
+end = time.time()
+print(f"🚀 Done! Sent {total_sent} records in {round(end - start, 2)} seconds.")
