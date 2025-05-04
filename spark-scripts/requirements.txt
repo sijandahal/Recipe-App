@@ -1,5 +1,7 @@
-pandas
-mysql-connector-python
-pyarrow
-sqlalchemy
-pymongo
+numpy==1.24.3
+pandas==1.5.3
+mysql-connector-python==8.0.26
+pymongo==4.3.3
+hdfs==2.7.0
+pyarrow==12.0.1
+sqlalchemy==2.0.15

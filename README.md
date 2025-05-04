@@ -110,27 +110,103 @@ volumes:
 
 ---
 
-### 🖎️ Step 7: Send Recipes to Kafka (Manually)
+### 🖎️ Step 7: Kafka Operations
+
+#### 📤 Step 7.1: Start Kafka Producer
 From the consumer folder:
 ```bash
-docker exec -it forkast-consumer-1 python kafka_producer.py
+docker exec -it recipe-app-consumer-1 python kafka_producer.py
 ```
-You’ll see output like:
+You'll see output like:
 ```
 [1] Sent to Kafka: {...}
 ```
 
----
+#### 📥 Step 7.2: Start Kafka Consumer
+```bash
+docker-compose up consumer
+```
+To view consumer logs:
+```bash
+docker-compose logs -f consumer
+```
 
-Go to sql
+#### 📊 Step 7.3: Verify Data in MySQL
+1. Connect to MySQL:
+```bash
+docker exec -it mysql mysql -uroot -proot forkast
+```
 
-ne
-Then in the MySQL prompt:
+2. Check data in MySQL:
+```sql
+-- Count total recipes
 SELECT COUNT(*) FROM recipes;
+
+-- View sample recipes
 SELECT * FROM recipes LIMIT 5;
 
+-- View recipe details
+SELECT id, title, calories, diet FROM recipes LIMIT 10;
+```
 
-### 🛑 Step 8: Stop Everything
+### 🗄️ Step 8: Setting up HDFS and Data Transfer
+
+#### 🐘 Step 8.1: Start HDFS Services
+```bash
+docker-compose up -d namenode datanode
+```
+
+#### 🔍 Step 8.2: Verify HDFS Status
+Access the Hadoop Web UI at:
+```
+http://localhost:9870
+```
+This will show you the HDFS cluster status and allow you to browse the file system.
+
+#### 📤 Step 8.3: Transfer Data to HDFS
+1. Build the data transfer service:
+```bash
+docker-compose build data-transfer
+```
+
+2. Run the data transfer service:
+```bash
+docker-compose up data-transfer
+```
+
+This will:
+- Extract data from MySQL and MongoDB
+- Save it to HDFS in JSON format
+- Create files in the `/data` directory
+
+#### 📂 Step 8.4: Verify Data in HDFS
+1. Through the Hadoop Web UI:
+   - Navigate to Utilities > Browse Directory
+   - Go to `/data` directory
+   - You'll see two files:
+     - `mysql_recipes_[timestamp].json`
+     - `mongo_data_[timestamp].json`
+
+2. Or through command line:
+```bash
+# List files in HDFS
+docker exec -it namenode hdfs dfs -ls /data
+
+# View file sizes
+docker exec -it namenode hdfs dfs -du -h /data
+```
+
+#### 📊 Step 8.5: View Data Statistics
+In the Hadoop Web UI, you can see:
+- File sizes
+- Replication factor
+- Block size
+- Last modified time
+- File permissions
+
+---
+
+### 🛑 Step 9: Stop Everything
 To stop the app:
 ```bash
 Ctrl + C
@@ -141,3 +217,5 @@ docker-compose down --volumes --remove-orphans
 ```
 
 ---
+
+## 🛠️ Project Structure

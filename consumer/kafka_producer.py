@@ -17,7 +17,7 @@ start = time.time()
 
 print("📦 Starting high-speed Kafka ingestion...")
 
-for chunk_index, chunk in enumerate(pd.read_csv('mainrecepie.csv', dtype=str, chunksize=chunksize, low_memory=False)):
+for chunk_index, chunk in enumerate(pd.read_csv('recipe.csv', dtype=str, chunksize=chunksize, low_memory=False)):
     records = chunk.to_dict(orient='records')
     futures = []
 
