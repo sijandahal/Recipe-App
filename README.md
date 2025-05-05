@@ -1,12 +1,8 @@
-<!-- Updated Readme.md -->
 
 # Forkast - Smart Meal Planner 🍱
 
 A full-stack big data project built with React + Flask + MongoDB + Kafka + MySQL + Docker.
 
----
-
-## 🚀 How to Run the App
 
 ### 📁 Step 1: Open Terminal and Navigate to Project
 
@@ -23,8 +19,6 @@ cd "C:\Users\\Desktop\forkast"
 ```bash
 docker-compose up --build
 ```
-Use `--build` only if dependencies or code changed.
-For normal runs, just use:
 
 ```bash
 docker-compose up
