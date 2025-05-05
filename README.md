@@ -146,8 +146,7 @@ SELECT COUNT(*) FROM recipes;
 SELECT * FROM recipes LIMIT 5;
 
 -- View recipe details
-SELECT id, title, calories, diet FROM recipes LIMIT 10;
-```
+docker exec -it mysql mysql -uroot -proot forkast -e "SELECT COUNT(*) FROM recipes; SELECT id, title FROM recipes ORDER BY id LIMIT 5;"
 
 ### 🗄️ Step 8: Setting up HDFS and Data Transfer
 
@@ -155,6 +154,12 @@ SELECT id, title, calories, diet FROM recipes LIMIT 10;
 ```bash
 docker-compose up -d namenode datanode
 ```
+
+
+<!-- transfer data to HDFS -->
+
+docker exec -it namenode hdfs dfs -ls /data
+
 
 #### 🔍 Step 8.2: Verify HDFS Status
 Access the Hadoop Web UI at:

@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-
 import "react-toastify/dist/ReactToastify.css";
+import config from "../../config";
+import axios from "axios";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const navigate = useNavigate(); 
+  
   const handleSignup = async (e) => {
     e.preventDefault();
 
@@ -18,25 +20,24 @@ export default function SignupPage() {
     }
 
     try {
-      const res = await fetch("http://localhost:5000/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const res = await axios.post(`${config.backendUrl}/register`, 
+        { email, password },
+        {
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          withCredentials: true
+        }
+      );
 
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(data.message || "Registration successful!");
-        setTimeout(() => navigate("/dashboard"), 2000); // 👈 Redirect to dashboard
+      if (res.status === 201) {
+        toast.success(res.data.message || "Registration successful!");
+        setTimeout(() => navigate("/dashboard"), 2000);
         localStorage.setItem("email", email);
-
-        // Optionally redirect to login after a delay
-        // setTimeout(() => navigate('/login'), 2000);
-      } else {
-        toast.error(data.error || "Registration failed");
       }
     } catch (err) {
-      toast.error("Server error. Please try again.");
+      toast.error(err.response?.data?.error || "Server error. Please try again.");
     }
   };
 

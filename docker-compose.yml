@@ -1,14 +1,28 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: recipe-app-backend-1
     ports:
       - "5000:5000"
     volumes:
       - ./backend:/app
     depends_on:
-      - mongo
-      - kafka
+      - spark-master
+      - namenode
       - mysql
+      - mongo
+    environment:
+      - FLASK_APP=app
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - SPARK_MASTER=spark://spark-master:7077
+      - HDFS_NAMENODE=namenode:9000
+      - SPARK_HOME=/opt/spark
+      - PYTHONPATH=/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip
+    networks:
+      - recipe-app-network
 
   frontend:
     build: ./frontend
@@ -18,17 +32,23 @@ services:
       - ./frontend:/app
     stdin_open: true
     tty: true
+    networks:
+      - recipe-app-network
 
   mongo:
     image: mongo
     ports:
       - "27017:27017"
+    networks:
+      - recipe-app-network
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.2.1
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - recipe-app-network
 
   kafka:
     image: confluentinc/cp-kafka:7.2.1
@@ -42,12 +62,14 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
       - zookeeper
+    networks:
+      - recipe-app-network
 
   mysql:
     image: mysql:8
     container_name: mysql
     ports:
-      - "3307:3306"  # external:internal
+      - "3307:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: forkast
@@ -58,6 +80,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - recipe-app-network
 
   consumer:
     build:
@@ -70,6 +94,9 @@ services:
     restart: unless-stopped
     volumes:
       - ./recipe.csv:/app/recipe.csv
+    networks:
+      - recipe-app-network
+
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
@@ -78,9 +105,11 @@ services:
       - "9000:9000"
     environment:
       - CLUSTER_NAME=forkast-hadoop
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000  # ✅ ADD THIS LINE
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
     volumes:
       - hdfs-namenode:/hadoop/dfs/name
+    networks:
+      - recipe-app-network
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
@@ -92,39 +121,73 @@ services:
       - hdfs-datanode:/hadoop/dfs/data
     depends_on:
       - namenode
+    networks:
+      - recipe-app-network
 
-  spark:
-    image: bitnami/spark:latest
-    container_name: spark
+  spark-master:
+    image: bitnami/spark:3.5.1
+    container_name: spark-master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    networks:
+      - recipe-app-network
+
+  spark-worker:
+    image: bitnami/spark:3.5.1
+    container_name: recipe-app-spark-worker-1
+    ports:
+      - "8081:8081"
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=4G
+      - SPARK_WORKER_CORES=4
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
     depends_on:
-      - namenode
-    command: >
-      bash -c "
-      pip install -r /app/requirements.txt &&
-      sleep infinity
-      "
-    volumes:
-      - ./spark-scripts:/app
-      - ./spark-scripts/jars:/opt/spark/jars
+      - spark-master
+    networks:
+      - recipe-app-network
 
   data-transfer:
     build:
       context: ./spark-scripts
       dockerfile: Dockerfile
     depends_on:
-      mysql:
-        condition: service_healthy
-      mongo:
-        condition: service_started
-      namenode:
-        condition: service_started
+      - mysql
+      - mongo
+      - namenode
     volumes:
       - ./spark-scripts:/app
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=root
+      - MYSQL_DATABASE=forkast
+      - MONGO_URI=mongodb://mongo:27017/
+      - HDFS_NAMENODE=hdfs://namenode:9000
+    command: sh -c "while true; do python data_to_hdfs.py; sleep 300; done"
+    restart: always
+    networks:
+      - recipe-app-network
 
 volumes:
   mysql-data:
   hdfs-namenode:
   hdfs-datanode:
+
+networks:
+  recipe-app-network:
+    driver: bridge
 
 
   

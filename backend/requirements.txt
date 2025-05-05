@@ -1,4 +1,8 @@
-Flask==2.2.5
-pymongo[srv]
-flask-cors
-Flask-JWT-Extended
+flask==2.3.3
+werkzeug==2.3.7
+pyspark==3.5.1
+pymongo==4.3.3
+flask-cors==4.0.0
+Flask-JWT-Extended==4.5.2
+requests==2.31.0
+numpy==1.24.3

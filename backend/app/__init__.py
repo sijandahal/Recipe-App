@@ -5,8 +5,15 @@ from flask_jwt_extended import JWTManager
 def create_app():
     app = Flask(__name__)
     
-    # Enable CORS
-    CORS(app)
+    # Enable CORS with specific configuration
+    CORS(app, resources={
+        r"/*": {
+            "origins": ["http://localhost:3000", "http://recipe-app-frontend-1:3000"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "Accept"],
+            "supports_credentials": True
+        }
+    })
 
     # Set JWT secret key
     app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Replace with env var in production

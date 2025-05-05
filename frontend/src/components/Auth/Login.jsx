@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import "react-toastify/dist/ReactToastify.css";
+import config from "../../config";
 
 export default function SigninPage() {
   const [email, setEmail] = useState("");
@@ -12,7 +13,7 @@ export default function SigninPage() {
     e.preventDefault();
 
     try {
-      const res = await fetch("http://localhost:5000/login", {
+      const res = await fetch(`${config.backendUrl}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -24,8 +25,6 @@ export default function SigninPage() {
         setTimeout(() => navigate("/dashboard"), 2000); 
         toast.success("Login successful!");
         localStorage.setItem("email", email);
-
-        
       } else {
         toast.error(data.error || "Login failed");
       }
@@ -49,7 +48,7 @@ export default function SigninPage() {
               Sign in to your account
             </h2>
             <p className="mt-2 text-sm text-gray-500">
-              Don’t have an account?{" "}
+              Don't have an account?{" "}
               <a href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
                 Sign up here
               </a>
