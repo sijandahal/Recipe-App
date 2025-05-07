@@ -62,20 +62,28 @@ function classNames(...classes) {
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [recommendations, setRecommendations] = useState([]);
+  const [showResults, setShowResults] = useState(false);
 
-  
   useEffect(() => {
     const storedEmail = localStorage.getItem("email");
     if (storedEmail) setUserEmail(storedEmail);
   }, []);
 
+  const handleFetchRecommendations = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/latest-recommendations");
+      const data = await response.json();
+      setRecommendations(data);
+      setShowResults(true);
+    } catch (error) {
+      console.error("Failed to fetch recommendations:", error);
+    }
+  };
+
   return (
     <div>
-      <Dialog
-        open={sidebarOpen}
-        onClose={setSidebarOpen}
-        className="relative z-50 lg:hidden"
-      >
+      <Dialog open={sidebarOpen} onClose={setSidebarOpen} className="relative z-50 lg:hidden">
         <DialogBackdrop className="fixed inset-0 bg-gray-900/80" />
         <div className="fixed inset-0 flex">
           <DialogPanel className="relative mr-16 flex w-full max-w-xs flex-1 transform bg-indigo-600">
@@ -134,11 +142,13 @@ export default function Dashboard() {
           </DialogPanel>
         </div>
       </Dialog>
+
       {userEmail === "guest@forkast.ai" && (
-    <div className="p-3 bg-yellow-100 text-yellow-800 rounded-md text-center">
-      You're using Forkast as a guest. Sign up to save your data!
-    </div>
-  )}
+        <div className="p-3 bg-yellow-100 text-yellow-800 rounded-md text-center">
+          You're using Forkast as a guest. Sign up to save your data!
+        </div>
+      )}
+
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col bg-primary px-6 pb-4">
         <div className="flex h-16 items-center">
           <img
@@ -202,10 +212,7 @@ export default function Dashboard() {
               <MagnifyingGlassIcon className="pointer-events-none col-start-1 row-start-1 size-5 self-center text-gray-400" />
             </form>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
-              <button
-                type="button"
-                className="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500"
-              >
+              <button type="button" className="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500">
                 <span className="sr-only">View notifications</span>
                 <BellIcon className="size-6" />
               </button>
@@ -245,14 +252,44 @@ export default function Dashboard() {
         <main className="py-10">
           <div className="px-4 sm:px-6 lg:px-8">
             <h1 className="text-2xl font-bold text-gray-900">
-              Welcome, {userEmail === "guest@forkast.ai" ? "Guest" : userEmail}{" "}
-              👋
+              Welcome, {userEmail === "guest@forkast.ai" ? "Guest" : userEmail} 👋
             </h1>
 
             <p className="mt-2 text-gray-600">
               This is your Forkast dashboard.
             </p>
-            <GroceryForm/>
+
+            <GroceryForm />
+
+            {/* 🔘 Button to Show Recommendations */}
+            <div className="mt-6">
+              <button
+                onClick={handleFetchRecommendations}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition"
+              >
+                Show Results
+              </button>
+            </div>
+
+            {/* 🧾 Display Results */}
+            {showResults && (
+              <div className="mt-6 displayresults grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {recommendations.map((item, index) => (
+                  <div key={index} className="border rounded-md p-4 shadow-sm bg-white">
+                    <h2 className="text-lg font-semibold text-indigo-700">{item.recipe_name}</h2>
+                    <p className="text-sm text-gray-600 mt-2">Ingredients:</p>
+                    <ul className="list-disc list-inside text-sm text-gray-800">
+                      {JSON.parse(item.ingredients).map((ingredient, i) => (
+                        <li key={i}>{ingredient}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-sm font-medium text-gray-700">
+                      Similarity Score: {item.similarity_score.toFixed(3)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </main>
       </div>

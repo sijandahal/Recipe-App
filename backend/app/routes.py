@@ -163,3 +163,23 @@ def get_recommendations():
         
         return jsonify({"error": str(e)}), 500
  
+
+import re
+@main.route('/api/latest-recommendations', methods=['GET'])
+def latest_recommendations():
+    try:
+        # Identify the latest file (assuming sorted naming with timestamps)
+        files = hdfs_client.list("/data")
+        latest_file = sorted(
+            [f for f in files if f.startswith("recommendations_") and f.endswith(".json")],
+            reverse=True
+        )[0]
+
+        # Read the file line-by-line and parse each JSON object
+        with hdfs_client.read(f"/data/{latest_file}", encoding="utf-8") as reader:
+            lines = reader.read().splitlines()
+            data = [json.loads(line) for line in lines if line.strip()]
+
+        return jsonify(data), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to read latest recommendations: {str(e)}"}), 500
