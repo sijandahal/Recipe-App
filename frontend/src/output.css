@@ -866,6 +866,10 @@ video {
   min-height: 100%;
 }
 
+.min-h-screen {
+  min-height: 100vh;
+}
+
 .w-0 {
   width: 0px;
 }
@@ -908,6 +912,10 @@ video {
 
 .w-\[200px\] {
   width: 200px;
+}
+
+.w-\[150px\] {
+  width: 150px;
 }
 
 .max-w-2xl {
@@ -1175,6 +1183,10 @@ video {
   background-color: rgb(243 244 246 / var(--tw-bg-opacity, 1));
 }
 
+.object-contain {
+  object-fit: contain;
+}
+
 .object-cover {
   object-fit: cover;
 }
@@ -1296,6 +1308,10 @@ video {
 
 .pt-5 {
   padding-top: 1.25rem;
+}
+
+.pl-14 {
+  padding-left: 3.5rem;
 }
 
 .text-center {
@@ -1587,6 +1603,10 @@ video {
 .hover\:text-gray-300:hover {
   --tw-text-opacity: 1;
   color: rgb(209 213 219 / var(--tw-text-opacity, 1));
+}
+
+.hover\:underline:hover {
+  text-decoration-line: underline;
 }
 
 .hover\:ring-white\/20:hover {

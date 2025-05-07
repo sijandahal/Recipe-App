@@ -259,7 +259,7 @@ export default function Dashboard() {
             <div className="mt-6">
               <button
                 onClick={handleFetchRecommendations}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition"
+                className="bg-primary text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition"
               >
                 Show Results
               </button>
@@ -271,7 +271,8 @@ export default function Dashboard() {
   <div className="">
     
     {showResults && (
-  <div className="mt-6 displayresults grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+ <div className="mt-6 displayresults grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
+
     {recommendations.map((item, index) => (
       <div
         key={index}
