@@ -7,7 +7,7 @@ from datetime import datetime
 import json
 import logging
 
-# Set up minimal logging
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ spark = SparkSession.builder \
     .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:3.0.1") \
     .getOrCreate()
 
-# Schema for recipe JSON data
+# Input recipe schema
 recipe_schema = StructType([
     StructField("id", IntegerType(), True),
     StructField("title", StringType(), True),
@@ -28,7 +28,7 @@ recipe_schema = StructType([
     StructField("NER", StringType(), True)
 ])
 
-# Output schema for recommendations
+# Output schema
 output_schema = StructType([
     StructField("recipe_id", LongType(), True),
     StructField("recipe_name", StringType(), True),
@@ -38,14 +38,17 @@ output_schema = StructType([
 
 def read_latest_hdfs_file(pattern):
     files = spark.sparkContext.wholeTextFiles(f"hdfs://namenode:9000/data/{pattern}*").collect()
+    if not files:
+        raise RuntimeError(f"No files found matching pattern: {pattern}")
     latest_file = max(files, key=lambda x: x[0])
     parsed_data = json.loads(latest_file[1])
     return spark.createDataFrame(parsed_data)
 
 def read_user_input_file():
     file = spark.sparkContext.wholeTextFiles("hdfs://namenode:9000/data/user_input.json").collect()
-    content = json.loads(file[0][1])
-    return content
+    if not file:
+        raise RuntimeError("user_input.json not found.")
+    return json.loads(file[0][1])
 
 def process_ingredients(ingredients_str):
     try:
@@ -70,6 +73,30 @@ def calculate_tfidf_similarity(user_ingredients, recipe_ingredients):
     except:
         return 0.0
 
+# 🔧 Key Fix: Move part file to flat .json using HDFS Java API
+def move_part_file_to_flat_json(tmp_path, final_path):
+    from py4j.java_gateway import java_import
+
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+    hadoop_conf.set("fs.defaultFS", "hdfs://namenode:9000")  # 🔥 Important fix
+
+    java_import(spark._jvm, "org.apache.hadoop.fs.FileSystem")
+    java_import(spark._jvm, "org.apache.hadoop.fs.Path")
+
+    fs = spark._jvm.FileSystem.get(hadoop_conf)
+    tmp_dir_path = spark._jvm.Path(tmp_path)
+    final_file_path = spark._jvm.Path(final_path)
+
+    file_statuses = fs.listStatus(tmp_dir_path)
+    for status in file_statuses:
+        name = status.getPath().getName()
+        if name.startswith("part-") and name.endswith(".json"):
+            part_path = status.getPath()
+            fs.rename(part_path, final_file_path)
+            fs.delete(tmp_dir_path, True)
+            logger.info(f"✅ Moved {name} to {final_path}")
+            break
+
 def main():
     try:
         recipes_df = read_latest_hdfs_file("mysql_recipes_")
@@ -78,11 +105,10 @@ def main():
 
         recipes_df = recipes_df.withColumn("row_id", monotonically_increasing_id())
         total_recipes = recipes_df.count()
-        batch_size = 100
         scored = []
 
-        for i in range(0, total_recipes, batch_size):
-            batch = recipes_df.filter((col("row_id") >= i) & (col("row_id") < i + batch_size)).collect()
+        for i in range(0, total_recipes, 100):
+            batch = recipes_df.filter((col("row_id") >= i) & (col("row_id") < i + 100)).collect()
             for row in batch:
                 recipe_ingredients = process_ingredients(row["ingredients"])
                 score = calculate_tfidf_similarity(user_ingredients, recipe_ingredients)
@@ -94,15 +120,24 @@ def main():
                 })
 
         top = sorted(scored, key=lambda x: x["similarity_score"], reverse=True)[:5]
-        logger.info(f"Top recommendations data: {json.dumps(top, indent=2)}")
+        print(json.dumps(top, indent=2))
 
+        # Save to HDFS
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = f"hdfs://namenode:9000/data/recommendations_{timestamp}.json"
-        recommendations_df = spark.createDataFrame(top, schema=output_schema)
-        recommendations_df.write.mode("overwrite").json(output_path)
+        tmp_path = f"hdfs://namenode:9000/data/tmp_recommendations_{timestamp}"
+        final_path = f"/data/recommendations_{timestamp}.json"
+
+        spark.createDataFrame(top, schema=output_schema) \
+            .coalesce(1) \
+            .write \
+            .mode("overwrite") \
+            .option("compression", "none") \
+            .json(tmp_path)
+
+        move_part_file_to_flat_json(tmp_path, final_path)
 
     except Exception as e:
-        pass
+        print(f"❌ ERROR: {str(e)}")
     finally:
         spark.stop()
 
