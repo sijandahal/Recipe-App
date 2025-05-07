@@ -101,11 +101,7 @@ export default function Dashboard() {
             </TransitionChild>
             <div className="flex grow flex-col gap-y-5 overflow-y-auto px-6 pb-4">
               <div className="flex h-16 items-center">
-                <img
-                  src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=white"
-                  className="h-8 w-auto"
-                  alt="Your Company"
-                />
+              <img alt="" src="./logo.jpg" className="h-40 w-auto" />
               </div>
               <nav className="flex flex-1 flex-col">
                 <ul className="flex flex-1 flex-col gap-y-7">
@@ -149,14 +145,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col bg-primary px-6 pb-4">
-        <div className="flex h-16 items-center">
-          <img
-            src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=white"
-            className="h-8 w-auto"
-            alt="Your Company"
-          />
-        </div>
+<div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col bg-primary px-6 pb-4">
+  <div className="">
+    <a href="/" className=" mb-10 h-20">
+      <img alt="Logo" src="./logo.jpg" className=" w-auto" />
+    </a>
+  </div>
         <nav className="flex flex-1 flex-col">
           <ul className="flex flex-1 flex-col gap-y-7">
             <li>
@@ -273,23 +267,56 @@ export default function Dashboard() {
 
             {/* 🧾 Display Results */}
             {showResults && (
-              <div className="mt-6 displayresults grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {recommendations.map((item, index) => (
-                  <div key={index} className="border rounded-md p-4 shadow-sm bg-white">
-                    <h2 className="text-lg font-semibold text-indigo-700">{item.recipe_name}</h2>
-                    <p className="text-sm text-gray-600 mt-2">Ingredients:</p>
-                    <ul className="list-disc list-inside text-sm text-gray-800">
-                      {JSON.parse(item.ingredients).map((ingredient, i) => (
-                        <li key={i}>{ingredient}</li>
-                      ))}
-                    </ul>
-                    <p className="mt-2 text-sm font-medium text-gray-700">
-                      Similarity Score: {item.similarity_score.toFixed(3)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+              
+  <div className="">
+    
+    {showResults && (
+  <div className="mt-6 displayresults grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {recommendations.map((item, index) => (
+      <div
+        key={index}
+        className={classNames(
+          "max-w-sm rounded overflow-hidden shadow-lg bg-white transition-transform transform hover:scale-105",
+          index % 2 === 0 ? "border-primary border-2" : "border-gray-300"
+        )}
+      >
+
+        <div className="px-6 py-4">
+          <div className={classNames(
+            "font-bold text-xl mb-2",
+            index % 2 === 0 ? "text-primary" : "text-gray-800"
+          )}>
+            {item.recipe_name}
+          </div>
+          <p className="text-sm text-gray-600">Ingredients:</p>
+          <ul className="list-disc list-inside text-sm text-gray-800">
+            {JSON.parse(item.ingredients).map((ingredient, i) => (
+              <li key={i}>{ingredient}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm font-medium text-gray-700">
+            Similarity Score: {item.similarity_score.toFixed(3)}
+          </p>
+        </div>
+        <div className="px-6 pt-4 pb-2">
+          <span className="inline-block text-white rounded-full px-3 py-1 text-sm font-semibold mr-2 mb-2 bg-primary">
+            #recipe
+          </span>
+          <span className="inline-block text-white rounded-full px-3 py-1 text-sm font-semibold mr-2 mb-2 bg-primary">
+            #food
+          </span>
+          <span className="inline-block text-white rounded-full px-3 py-1 text-sm font-semibold mr-2 mb-2 bg-primary">
+            #ingredients
+          </span>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
+  </div>
+)}
+
           </div>
         </main>
       </div>
