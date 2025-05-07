@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 import os
 from flask_cors import CORS
+from hdfs import InsecureClient
 
 main = Blueprint("main", __name__)
 CORS(main, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
@@ -44,6 +45,38 @@ recipe_schema = {
     "NER": "string"
 }
 
+hdfs_client = InsecureClient('http://namenode:9870', user='root')
+def write_to_hdfs(data, hdfs_path):
+    """Write data to HDFS using hdfs.InsecureClient"""
+    try:
+        # Format data as JSON with proper indentation
+        json_str = json.dumps(data, indent=2)
+        
+        # Create parent directory if it doesn't exist
+        parent_dir = os.path.dirname(hdfs_path)
+   
+        hdfs_client.makedirs(parent_dir)
+     
+        # Write data to HDFS
+        with hdfs_client.write(hdfs_path, overwrite=True, encoding='utf-8') as writer:
+            writer.write(json_str)
+            
+    
+        return True
+    except Exception as e:
+    
+        return False
+ 
+def read_from_hdfs(hdfs_path):
+    """Read data from HDFS using the hdfs client"""
+    try:
+        with hdfs_client.read(hdfs_path, encoding='utf-8') as reader:
+            data = reader.read()
+            return json.loads(data)
+    except Exception as e:
+      
+        return None
+ 
 @main.route("/upload-groceries", methods=["POST", "OPTIONS"])
 def upload_groceries():
     if request.method == "OPTIONS":
@@ -52,55 +85,81 @@ def upload_groceries():
         response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         return response
-
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No input received"}), 400
-    
+ 
     try:
-        # Read the latest recipes file from HDFS
-        files = spark.sparkContext.wholeTextFiles("hdfs://namenode:9000/data/mysql_recipes_*").keys().collect()
-        if not files:
-            return jsonify({"error": "No recipe data found"}), 404
+        data = request.json
+        if not data or "ingredients" not in data:
+            return jsonify({"error": "No ingredients provided"}), 400
+ 
+        # Extract just the ingredients and add timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ingredients_data = {
+            "ingredients": data["ingredients"],
+            "timestamp": timestamp
+        }
+
         
-        latest_file = max(files)
-        recipes_df = spark.read.json(latest_file)
+        # Write data to HDFS with timestamp in filename
+        hdfs_path = '/data/user_input.json'
+        if not write_to_hdfs(ingredients_data, hdfs_path):
+            return jsonify({"error": "Failed to write to HDFS"}), 500
+            
+    
+        return jsonify({"message": "Ingredients uploaded successfully"}), 200
+ 
+    except Exception as e:
+       
+        return jsonify({"error": str(e)}), 500
+ 
+@main.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    try:
+        return jsonify({
+            "status": "healthy",
+            "message": "Service is running"
+        }), 200
+    except Exception as e:
         
-        # Convert ingredients to lowercase for case-insensitive matching
-        user_ingredients = [i.lower() for i in data["ingredients"]]
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e)
+        }), 500
+ 
+@main.route('/api/recommendations', methods=['POST'])
+def get_recommendations():
+    try:
+        # Get ingredients from request
+        data = request.get_json()
+        ingredients = data.get('ingredients', [])
         
-        # Define a UDF to calculate recipe score based on ingredient matches
-        def calculate_score(recipe_ingredients):
-            try:
-                recipe_ingredients = json.loads(recipe_ingredients)
-                recipe_ingredients = [i.lower() for i in recipe_ingredients]
-                matches = sum(1 for i in user_ingredients if any(i in r for r in recipe_ingredients))
-                return float(matches) / len(user_ingredients)
-            except:
-                return 0.0
+        if not ingredients:
+            return jsonify({"error": "No ingredients provided"}), 400
         
-        score_udf = udf(calculate_score, FloatType())
+        # Write ingredients to HDFS
+        with hdfs_client.write('/data/user_input.json', encoding='utf-8') as writer:
+            json.dump(data, writer)
         
-        # Calculate scores and get top 5 recommendations
-        recommendations = recipes_df.withColumn(
-            "score",
-            score_udf(col("ingredients"))
-        ).orderBy(col("score").desc()).limit(5)
+        # Execute Spark job
+        spark_script = '/app/spark-scripts/recommendations.py'
+        result = subprocess.run(['python3', spark_script],
+                              capture_output=True,
+                              text=True)
         
-        # Convert to JSON response
-        result = recommendations.select(
-            col("id").alias("recipe_id"),
-            col("title").alias("recipe_title"),
-            col("ingredients"),
-            col("directions").alias("instructions"),
-            col("score")
-        ).toJSON().collect()
+        if result.returncode != 0:
+            
+            return jsonify({"error": "Failed to generate recommendations"}), 500
         
-        response = jsonify({
-            "recommendations": [json.loads(r) for r in result]
-        })
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        return response
+        # Read recommendations from HDFS
+        try:
+            with hdfs_client.read('/data/recommendations.json') as reader:
+                recommendations = json.load(reader)
+            return jsonify(recommendations)
+        except Exception as e:
+            
+            return jsonify({"error": "Failed to read recommendations"}), 500
         
     except Exception as e:
+        
         return jsonify({"error": str(e)}), 500
+ 

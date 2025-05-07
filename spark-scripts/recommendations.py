@@ -1,9 +1,15 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, explode, array_contains, lit, collect_list, struct, row_number, from_json, to_json
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, ArrayType
-from pyspark.sql.window import Window
-import json
+from pyspark.sql.functions import col, monotonically_increasing_id
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, DoubleType
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 from datetime import datetime
+import json
+import logging
+
+# Set up minimal logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize Spark session
 spark = SparkSession.builder \
@@ -11,7 +17,7 @@ spark = SparkSession.builder \
     .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:3.0.1") \
     .getOrCreate()
 
-# Define schema for recipes
+# Schema for recipe JSON data
 recipe_schema = StructType([
     StructField("id", IntegerType(), True),
     StructField("title", StringType(), True),
@@ -22,119 +28,83 @@ recipe_schema = StructType([
     StructField("NER", StringType(), True)
 ])
 
-# Define schema for user data
-user_schema = StructType([
-    StructField("users", ArrayType(
-        StructType([
-            StructField("_id", StringType(), True),
-            StructField("email", StringType(), True),
-            StructField("password", StringType(), True)
-        ])
-    ), True),
-    StructField("ratings", ArrayType(
-        StructType([
-            StructField("user_id", StringType(), True),
-            StructField("recipe_id", IntegerType(), True),
-            StructField("rating", IntegerType(), True)
-        ])
-    ), True),
-    StructField("comments", ArrayType(
-        StructType([
-            StructField("user_id", StringType(), True),
-            StructField("recipe_id", IntegerType(), True),
-            StructField("comment", StringType(), True)
-        ])
-    ), True)
+# Output schema for recommendations
+output_schema = StructType([
+    StructField("recipe_id", LongType(), True),
+    StructField("recipe_name", StringType(), True),
+    StructField("ingredients", StringType(), True),
+    StructField("similarity_score", DoubleType(), True)
 ])
 
-# Read data from HDFS
-def read_latest_hdfs_file(pattern, schema=None):
-    # Get list of files matching pattern
-    files = spark.sparkContext.wholeTextFiles(f"hdfs://namenode:9000/data/{pattern}*").keys().collect()
-    if not files:
-        raise Exception(f"No files found matching pattern: {pattern}")
-    # Get the latest file
-    latest_file = max(files)
-    return spark.read.schema(schema).json(latest_file)
+def read_latest_hdfs_file(pattern):
+    files = spark.sparkContext.wholeTextFiles(f"hdfs://namenode:9000/data/{pattern}*").collect()
+    latest_file = max(files, key=lambda x: x[0])
+    parsed_data = json.loads(latest_file[1])
+    return spark.createDataFrame(parsed_data)
 
-# Read recipes and user data
-recipes_df = read_latest_hdfs_file("mysql_recipes_", recipe_schema)
-user_data_df = read_latest_hdfs_file("mongo_data_", user_schema)
+def read_user_input_file():
+    file = spark.sparkContext.wholeTextFiles("hdfs://namenode:9000/data/user_input.json").collect()
+    content = json.loads(file[0][1])
+    return content
 
-# Extract users from nested structure
-users_df = user_data_df.select(explode("users").alias("user")).select(
-    col("user._id").alias("user_id"),
-    col("user.email")
-)
+def process_ingredients(ingredients_str):
+    try:
+        if isinstance(ingredients_str, str):
+            try:
+                ingredients = json.loads(ingredients_str)
+            except:
+                ingredients = [ingredients_str]
+        else:
+            ingredients = ingredients_str
+        return ' '.join([str(i).lower().strip() for i in ingredients])
+    except:
+        return str(ingredients_str).lower().strip()
 
-# Preprocess recipes data
-recipes_df = recipes_df.select(
-    col("id").alias("recipe_id"),
-    col("title").alias("recipe_title"),
-    col("ingredients"),
-    col("directions").alias("instructions"),
-    col("NER").alias("diet")
-)
+def calculate_tfidf_similarity(user_ingredients, recipe_ingredients):
+    try:
+        if not user_ingredients or not recipe_ingredients:
+            return 0.0
+        vectorizer = TfidfVectorizer(lowercase=True, stop_words='english')
+        tfidf_matrix = vectorizer.fit_transform([user_ingredients, recipe_ingredients])
+        return float(cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0])
+    except:
+        return 0.0
 
-# Function to calculate recipe score based on ingredients match
-def calculate_recipe_score(user_ingredients, recipe_ingredients):
-    # For now, assign a random score since we don't have user preferences
-    from random import random
-    return random()
+def main():
+    try:
+        recipes_df = read_latest_hdfs_file("mysql_recipes_")
+        user_input = read_user_input_file()
+        user_ingredients = process_ingredients(user_input.get("ingredients", ""))
 
-# Register UDF for score calculation
-from pyspark.sql.types import FloatType
-from pyspark.sql.functions import udf
+        recipes_df = recipes_df.withColumn("row_id", monotonically_increasing_id())
+        total_recipes = recipes_df.count()
+        batch_size = 100
+        scored = []
 
-calculate_score_udf = udf(calculate_recipe_score, FloatType())
+        for i in range(0, total_recipes, batch_size):
+            batch = recipes_df.filter((col("row_id") >= i) & (col("row_id") < i + batch_size)).collect()
+            for row in batch:
+                recipe_ingredients = process_ingredients(row["ingredients"])
+                score = calculate_tfidf_similarity(user_ingredients, recipe_ingredients)
+                scored.append({
+                    "recipe_id": row["id"],
+                    "recipe_name": row["title"],
+                    "ingredients": row["ingredients"],
+                    "similarity_score": score
+                })
 
-# Generate recommendations
-def generate_recommendations(users_df, recipes_df, top_n=5):
-    # Cross join users with recipes
-    recommendations = users_df.crossJoin(recipes_df)
-    
-    # Calculate scores (random for now)
-    recommendations = recommendations.withColumn(
-        "score",
-        calculate_score_udf(lit(None), lit(None))
-    )
-    
-    # Rank recipes for each user
-    window = Window.partitionBy("user_id").orderBy(col("score").desc())
-    recommendations = recommendations.withColumn("rank", row_number().over(window))
-    
-    # Get top N recommendations
-    top_recommendations = recommendations.filter(col("rank") <= top_n)
-    
-    # Format output
-    output = top_recommendations.groupBy("user_id", "email").agg(
-        collect_list(
-            struct(
-                col("recipe_id"),
-                col("recipe_title"),
-                col("score")
-            )
-        ).alias("recommendations")
-    )
-    
-    return output
+        top = sorted(scored, key=lambda x: x["similarity_score"], reverse=True)[:5]
+        logger.info(f"Top recommendations data: {json.dumps(top, indent=2)}")
 
-# Generate recommendations
-recommendations_df = generate_recommendations(users_df, recipes_df)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = f"hdfs://namenode:9000/data/recommendations_{timestamp}.json"
+        recommendations_df = spark.createDataFrame(top, schema=output_schema)
+        recommendations_df.write.mode("overwrite").json(output_path)
 
-# Convert recommendations to JSON format
-recommendations_json = recommendations_df.select(
-    col("user_id"),
-    col("email"),
-    to_json(col("recommendations")).alias("recommendations")
-).toPandas().to_json(orient="records")
+    except Exception as e:
+        pass
+    finally:
+        spark.stop()
 
-# Write recommendations to HDFS
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_path = f"hdfs://namenode:9000/data/recommendations_{timestamp}.json"
-
-# Write JSON string to HDFS
-spark.sparkContext.parallelize([recommendations_json]).saveAsTextFile(output_path)
-
-# Stop Spark session
-spark.stop() 
+if __name__ == "__main__":
+    main()
